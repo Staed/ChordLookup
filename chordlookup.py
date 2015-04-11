@@ -14,27 +14,27 @@ defaultPort = 8000
 
 #node class
 class node(object):
-    def _init_ (self, identifier_from_coord):
+    def __init__ (self, identifier_from_coord):
         self.t_listen = None
         self.identifier = identifier_from_coord
         self.fingertable = intervalTable()
-        self.port = defaultPort + self.identifier
+        self.port = defaultPort + int(self.identifier)
         self.selfIP = "127.0.0.1"
         self.sock_listen = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock_send = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock_listen.bind((self.selfIP, self.port))
         print "node initiated"
         
-    def start(self, identifier_from_coord):
+    def start(self):
         #notify coordinator the node been created
-        message = "ack " + identifier_from_coord 
-        self.send(message, defaultPort)
-        print "node " + identifier + " ack message send back to coordinator"
+        message = "ack " + self.identifier
+        self.send(message, defaultPort-1)
+        print "node " + self.identifier + " ack message send back to coordinator"
         self.t_listen=threading.Thread(target=self.listen)
         self.t_listen.start()
         
     def listen(self):
-        print "node " + identifier + " listening"
+        print "node " + self.identifier + " listening"
         while True:
             message, addr = self.sock_listen.recvfrom(1024)
             print message
@@ -79,17 +79,26 @@ class chordlookup(object):
         selfIP = "127.0.0.1"
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.bind((selfIP, defaultPort-1))
+        self.t_listen=threading.Thread(target=self.listen)
+        self.t_listen.start()
 
     def start(self):
         self.t_coord=threading.Thread(target=self.coordinator)
         self.t_coord.start()
 
-        defaultNode = node()
-        threads[0] = threading.Thread(target=defaultNode.start, args=("0",))  # Create the default node
+        defaultNode = node("0")
+        threads[0] = threading.Thread(target=defaultNode.start).start()  # Create the default node
 
         #for thread in threads:
         #    thread.join()
         #self.t_coord.join()
+
+    def listen(self):
+        while True:
+            message, addr = self.sock.recvfrom(1024)
+            print "[RECV] " + message
+            if not message:
+                 continue
         
     def coordinator(self):   # Coordinator Thread
         global defaultPort
@@ -102,28 +111,24 @@ class chordlookup(object):
 
             if cmdP[0] == "join":       # join p
                 # @TODO[Kelsey] Check if thread P already exists
-                nS = node()
-                thread = threading.Thread(target=nS.start, args=(cmdP[1],))
+                nS = node(cmdP[1])
+                thread = threading.Thread(target=nS.start)
                 thread.start()
                 threads[int(cmdP[1])] = thread
-                
-                data, addr = self.sock.recvfrom(1024)
-                dataS = data.split(" ")
-                print "Received " + dataS[0] + " from node " + dataS[1] + "\n"
 
             elif cmdP[0] == "find":       # find p k
                 self.sock.sendto("find" + cmdP[2], (selfIP, defaultPort + int(cmdP[1])))
-                data, addr = self.sock.recvfrom(1024)
+                #data, addr = self.sock.recvfrom(1024)
 
                 # dissect data for location of k (the identifier of a node
 
             elif cmdP[0] == "leave":      # leave p
                 self.sock.sendto("leave", (selfIP, defaultPort + int(cmdP[1])))
-                data, addr = self.sock.recvfrom(1024)
+                #data, addr = self.sock.recvfrom(1024)
 
-                dataS = data.split(" ")
-                if dataS[0].lower() == "left":
-                    print "Node " + dataS[1] + " has left the network.\n"
+                #dataS = data.split(" ")
+                #if dataS[0].lower() == "left":
+                #    print "Node " + dataS[1] + " has left the network.\n"
 
             elif cmdP[0] == "show":
                 countMsg = 1
@@ -134,11 +139,11 @@ class chordlookup(object):
                 else:                   # show p
                     self.sock.sendto("show", (selfIP, defaultPort + i))
 
-                while countMsg > 0:     # While we still expect a result
-                    data, addr = self.sock.recvfrom(1024)
-                    # @TODO[Kelsey] Format data
-                    print data
-                    countMsg -= 1
+                #while countMsg > 0:     # While we still expect a result
+                #    data, addr = self.sock.recvfrom(1024)
+                #    # @TODO[Kelsey] Format data
+                #    print data
+                #    countMsg -= 1
 
             elif cmdP[0] == "exit":
                 exitFlag = True
