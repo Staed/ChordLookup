@@ -104,8 +104,8 @@ class chordlookup(object):
 
             if cmdP[0] == "join":       # join p
                 # @TODO[Kelsey] Check if thread P already exists
-                nS = node()
-                thread = threading.Thread(target=nS.start, args=(cmdP[1]))
+                nS = node(cmdP[1])
+                thread = threading.Thread(target=nS.start)
                 thread.start()
                 threads[int(cmdP[1])] = thread
                 
