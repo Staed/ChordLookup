@@ -71,24 +71,25 @@ class intervalTable:
 
 #coordinator class
 class chordlookup(object):
-    def __init__(self, input):
+    def __init__(self):
         global defaultPort
         for i in range(0, 256):
             keys[i] = i
 
         selfIP = "127.0.0.1"
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.bind((selfIP, defaultPort))
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sock.bind((selfIP, defaultPort))
 
     def start(self):
         self.t_coord=threading.Thread(target=self.coordinator)
         self.t_coord.start()
 
-        threads[0] = threading.Thread(target=node)  # Create the default node
+        defaultNode = node()
+        threads[0] = threading.Thread(target=defaultNode.start, args="0")  # Create the default node
 
-        for thread in threads:
-            thread.join()
-        self.t_coord.join()
+        #for thread in threads:
+        #    thread.join()
+        #self.t_coord.join()
         
     def coordinator(self):   # Coordinator Thread
         global defaultPort
@@ -96,24 +97,31 @@ class chordlookup(object):
 
         while not(exitFlag):
             userinput = stdin.readline()
-            cmdP = userInput.split(" ")
+            cmdP = userinput.split(" ")
             cmdP[0] = cmdP[0].lower()
+
+            print cmdP[1]
 
             if cmdP[0] == "join":       # join p
                 # @TODO[Kelsey] Check if thread P already exists
-                thread = threading.Thread(target=node)
+                nS = node()
+                thread = threading.Thread(target=nS.start, args=(cmdP[1]))
                 thread.start()
-                threads[i] = thread
+                threads[int(cmdP[1])] = thread
+                
+                data, addr = self.sock.recvfrom(1024)
+                dataS = data.split(" ")
+                print "Received " + dataS[0] + " from node " + dataS[1] + "\n"
 
             elif cmdP[0] == "find":       # find p k
-                sock.sendto("find" + cmdP[2], (selfIP, defaultPort + int(cmdP[1])))
-                data, addr = sock.recvfrom(1024)
+                self.sock.sendto("find" + cmdP[2], (selfIP, defaultPort + int(cmdP[1])))
+                data, addr = self.sock.recvfrom(1024)
 
                 # dissect data for location of k (the identifier of a node
 
             elif cmdP[0] == "leave":      # leave p
-                sock.sendto("leave", (selfIP, defaultPort + int(cmdP[1])))
-                data, addr = sock.recvfrom(1024)
+                self.sock.sendto("leave", (selfIP, defaultPort + int(cmdP[1])))
+                data, addr = self.sock.recvfrom(1024)
 
                 dataS = data.split(" ")
                 if dataS[0].lower() == "left":
@@ -124,12 +132,12 @@ class chordlookup(object):
                 if cmdP[1] == "all":    # show all
                     countMsg = 256
                     for i in range(0, 256):
-                        sock.sendto("show", (selfIP, defaultPort + i))
+                        self.sock.sendto("show", (selfIP, defaultPort + i))
                 else:                   # show p
-                    sock.sendto("show", (selfIP, defaultPort + i))
+                    self.sock.sendto("show", (selfIP, defaultPort + i))
 
                 while countMsg > 0:     # While we still expect a result
-                    data, addr = sock.recvfrom(1024)
+                    data, addr = self.sock.recvfrom(1024)
                     # @TODO[Kelsey] Format data
                     print data
                     countMsg -= 1
@@ -138,4 +146,5 @@ class chordlookup(object):
                 exitFlag = True
 
 if __name__ == '__main__':
-    chordLookup.start()
+    cl = chordlookup()
+    cl.start()
