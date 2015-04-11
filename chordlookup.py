@@ -10,6 +10,60 @@ identifier = 0
 keys[256]
 threads = []
 
+#node class
+class node(object):
+    def _init_ (self, identifier_from_coord):
+        self.t_listen = None
+        self.identifier = identifier_coord
+        self.fingertable = intervalTable()
+        self.port = defaultPort + self.identifier
+        self.selfIP="127.0.0.1"
+        self.sock_listen = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sock_send = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sock_listen.bind((self.selfIP, self.port))
+    
+    def start(self):
+        #notify coordinator the node been created
+        message = "ack "+identifier 
+        send(message, defaultPort)
+        self.t_listen=threading.Thread(target=self.listen)
+        self.t_listen.start()
+        
+    def listen(self):
+        while True:
+            message, addr = self.sock_listen.recvfrom(1024)
+            print message
+            if not message:
+                 continue
+             
+            message = message.split(" ")
+            if(message[0] == "find"):
+                continue
+            elif(message[0]=="leave"):
+                continue
+            elif(message[0]=="show"):
+                continue
+            elif(message[0]=="show all"):
+                continue
+    
+    def send(self, message, port):
+        self.sock_send.sendto(message, (self.selfIP,port))
+    
+    
+    
+#fingertable class 
+class intervalTable:
+    def _init_ (self):
+        self.node=0
+        self.successor=0
+        self.predecesoor=0
+        self.interval=(0,0)
+        #TO-ADD char str[INET_ADDRSTRLEN];
+    
+
+
+
+#coordinator class
 class chordlookup(object):
     def __init__(self, input):
         selfIP = "127.0.0.1"
@@ -44,7 +98,7 @@ class chordlookup(object):
                     self.sendto
 
 
-    def node(self):
+    #def node(self):
         # Stuff
                 
 if __name__ == '__main__':
