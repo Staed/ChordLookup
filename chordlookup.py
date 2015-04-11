@@ -78,7 +78,7 @@ class chordlookup(object):
 
         selfIP = "127.0.0.1"
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.sock.bind((selfIP, defaultPort))
+        self.sock.bind((selfIP, defaultPort-1))
 
     def start(self):
         self.t_coord=threading.Thread(target=self.coordinator)
