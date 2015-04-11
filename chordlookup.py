@@ -1,5 +1,5 @@
 # CS425 MP2
-# Kelsey， Chester， 2015
+# Kelsey, Chester, 2015
 import socket
 import threading
 from threading import Thread
@@ -12,7 +12,10 @@ threads = []
 
 class chordlookup(object):
     def __init__(self, input):
-        self._Queue= Queue.Queue()
+        selfIP = "127.0.0.1"
+        defaultPort = 8000
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.bind((UDP_IP, UDP_PORT))
 
     def start(self):
         self.t_coord=threading.Thread(target=self.coordinator)
@@ -29,9 +32,17 @@ class chordlookup(object):
             userinput = stdin.readline()
             cmdP = userInput.split(" ")
 
-            if cmdP[0] == "join":
+            if cmdP[0] == "join":   # join p
                 thread = threading.Thread(target=node)
                 thread.start()
+                threads.append(thread)
+            if cmdP[0] == "find":   # find p k
+            if cmdP[0] == "leave":  # leave p
+            if cmdP[0] == "show":
+                if cmdP[1] == "all":    # show all
+                else:                   # show p
+                    self.sendto
+
 
     def node(self):
         # Stuff
