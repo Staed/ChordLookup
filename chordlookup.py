@@ -23,15 +23,18 @@ class node(object):
         self.sock_listen = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock_send = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock_listen.bind((self.selfIP, self.port))
-    
+        print "node initiated"
+        
     def start(self):
         #notify coordinator the node been created
         message = "ack "+identifier 
         send(message, defaultPort)
+        print "node " + identifier + " ack message send back to coordinator"
         self.t_listen=threading.Thread(target=self.listen)
         self.t_listen.start()
         
     def listen(self):
+        print "node " + identifier + " listening"
         while True:
             message, addr = self.sock_listen.recvfrom(1024)
             print message
@@ -60,6 +63,7 @@ class intervalTable:
         self.successor=0
         self.predecesoor=0
         self.interval=(0,0)
+        print "fingertable initiated"
         #TO-ADD char str[INET_ADDRSTRLEN];
     
 
