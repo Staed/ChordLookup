@@ -7,8 +7,10 @@ import sys
 from sys import stdin
 
 identifier = 0
-keys[256]
-threads = []
+keys = [None] * 256
+
+threads = [None] * 256
+defaultPort = 8000
 
 #node class
 class node(object):
@@ -66,43 +68,70 @@ class intervalTable:
 #coordinator class
 class chordlookup(object):
     def __init__(self, input):
+        global defaultPort
+        for i in range(0, 256):
+            keys[i] = i
+
         selfIP = "127.0.0.1"
-        defaultPort = 8000
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.bind((UDP_IP, UDP_PORT))
+        sock.bind((selfIP, defaultPort))
 
     def start(self):
         self.t_coord=threading.Thread(target=self.coordinator)
         self.t_coord.start()
+
+        threads[0] = threading.Thread(target=node)  # Create the default node
 
         for thread in threads:
             thread.join()
         self.t_coord.join()
         
     def coordinator(self):   # Coordinator Thread
+        global defaultPort
         exitFlag = False
+
         while not(exitFlag):
-            # message, addr = self.s_listen.recvfrom(1024)
             userinput = stdin.readline()
             cmdP = userInput.split(" ")
+            cmdP[0] = cmdP[0].lower()
 
-            if cmdP[0] == "join":   # join p
+            if cmdP[0] == "join":       # join p
+                # @TODO[Kelsey] Check if thread P already exists
                 thread = threading.Thread(target=node)
                 thread.start()
-                threads.append(thread)
-            if cmdP[0] == "find":   # find p k
-            if cmdP[0] == "leave":  # leave p
-            if cmdP[0] == "show":
+                threads[i] = thread
+
+            elif cmdP[0] == "find":       # find p k
+                sock.sendto("find" + cmdP[2], (selfIP, defaultPort + int(cmdP[1])))
+                data, addr = sock.recvfrom(1024)
+
+                # dissect data for location of k (the identifier of a node
+
+            elif cmdP[0] == "leave":      # leave p
+                sock.sendto("leave", (selfIP, defaultPort + int(cmdP[1])))
+                data, addr = sock.recvfrom(1024)
+
+                dataS = data.split(" ")
+                if dataS[0].lower() == "left":
+                    print "Node " + dataS[1] + " has left the network.\n"
+
+            elif cmdP[0] == "show":
+                countMsg = 1
                 if cmdP[1] == "all":    # show all
+                    countMsg = 256
+                    for i in range(0, 256):
+                        sock.sendto("show", (selfIP, defaultPort + i))
                 else:                   # show p
-                    self.sendto
+                    sock.sendto("show", (selfIP, defaultPort + i))
 
+                while countMsg > 0:     # While we still expect a result
+                    data, addr = sock.recvfrom(1024)
+                    # @TODO[Kelsey] Format data
+                    print data
+                    countMsg -= 1
 
-    #def node(self):
-        # Stuff
-                
+            elif cmdP[0] == "exit":
+                exitFlag = True
+
 if __name__ == '__main__':
-    if len(sys.argv) <2:
-        sys.argv.append(raw_input('Central Server> Please choose the consistency model:\n 1.Linearizability\n 2.Sequential consistency\n 3.Eventual consistency, W=1, R=1\n 4.Eventual consistency, W=2, R=2\n Central Server>'))
-    usc = Central_server(sys.argv[1])
-    usc.start()
+    chordLookup.start()
