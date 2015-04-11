@@ -15,7 +15,7 @@ class chordlookup(object):
         selfIP = "127.0.0.1"
         defaultPort = 8000
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.bind((UDP_IP, UDP_PORT))
+        sock.bind((selfIP, defaultPort))
 
     def start(self):
         self.t_coord=threading.Thread(target=self.coordinator)
@@ -31,15 +31,24 @@ class chordlookup(object):
             # message, addr = self.s_listen.recvfrom(1024)
             userinput = stdin.readline()
             cmdP = userInput.split(" ")
+            cmdP[0] = cmdP[0].lower()
 
             if cmdP[0] == "join":   # join p
+                # @TODO[Kelsey] Add to 
                 thread = threading.Thread(target=node)
                 thread.start()
                 threads.append(thread)
+
             if cmdP[0] == "find":   # find p k
+                sock.sendto("find" + cmdP[2], (selfIP, defaultPort + int(cmdP[1])))
+
             if cmdP[0] == "leave":  # leave p
+                sock.sendto("leave", (selfIP, defaultPort + int(cmdP[1])))
+
             if cmdP[0] == "show":
                 if cmdP[1] == "all":    # show all
+                    # for i from 0 to 256
+                    # sock.sendto("leave", (selfIP, defaultPort + i))
                 else:                   # show p
                     self.sendto
 
