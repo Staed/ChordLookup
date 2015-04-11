@@ -16,19 +16,19 @@ defaultPort = 8000
 class node(object):
     def _init_ (self, identifier_from_coord):
         self.t_listen = None
-        self.identifier = identifier_coord
+        self.identifier = identifier_from_coord
         self.fingertable = intervalTable()
         self.port = defaultPort + self.identifier
-        self.selfIP="127.0.0.1"
+        self.selfIP = "127.0.0.1"
         self.sock_listen = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock_send = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock_listen.bind((self.selfIP, self.port))
         print "node initiated"
         
-    def start(self):
+    def start(self, identifier_from_coord):
         #notify coordinator the node been created
-        message = "ack "+identifier 
-        send(message, defaultPort)
+        message = "ack " + identifier_from_coord 
+        self.send(message, defaultPort)
         print "node " + identifier + " ack message send back to coordinator"
         self.t_listen=threading.Thread(target=self.listen)
         self.t_listen.start()
@@ -85,7 +85,7 @@ class chordlookup(object):
         self.t_coord.start()
 
         defaultNode = node()
-        threads[0] = threading.Thread(target=defaultNode.start, args="0")  # Create the default node
+        threads[0] = threading.Thread(target=defaultNode.start, args=("0",))  # Create the default node
 
         #for thread in threads:
         #    thread.join()
@@ -100,12 +100,10 @@ class chordlookup(object):
             cmdP = userinput.split(" ")
             cmdP[0] = cmdP[0].lower()
 
-            print cmdP[1]
-
             if cmdP[0] == "join":       # join p
                 # @TODO[Kelsey] Check if thread P already exists
-                nS = node(cmdP[1])
-                thread = threading.Thread(target=nS.start)
+                nS = node()
+                thread = threading.Thread(target=nS.start, args=(cmdP[1],))
                 thread.start()
                 threads[int(cmdP[1])] = thread
                 
