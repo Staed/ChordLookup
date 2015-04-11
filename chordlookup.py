@@ -10,14 +10,15 @@ identifier = 0
 keys = [None] * 256
 
 threads = [None] * 256
+defaultPort = 8000
 
 class chordlookup(object):
     def __init__(self, input):
+        global defaultPort
         for i in range(0, 256):
             keys[i] = i
 
         selfIP = "127.0.0.1"
-        defaultPort = 8000
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.bind((selfIP, defaultPort))
 
@@ -32,7 +33,9 @@ class chordlookup(object):
         self.t_coord.join()
         
     def coordinator(self):   # Coordinator Thread
+        global defaultPort
         exitFlag = False
+
         while not(exitFlag):
             userinput = stdin.readline()
             cmdP = userInput.split(" ")
