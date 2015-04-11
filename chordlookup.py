@@ -1,5 +1,5 @@
 # CS425 MP2
-# Kelsey, Chester
+# Kelsey， Chester， 2015
 import socket
 import threading
 from threading import Thread
