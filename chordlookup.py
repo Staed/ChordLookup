@@ -10,7 +10,7 @@ identifier = 0
 #keys = [None] * 256
 
 threads = [None] * 256
-defaultPort = 8128
+defaultPort = 8150
 
 #node class
 class node(object):
@@ -40,7 +40,7 @@ class node(object):
                 self.keys[i]=i
         #[Chester] potential some communication with coordinator before call join function.
         self.join(self.identifier)
-        
+
         
         
     def listen(self):
@@ -52,6 +52,7 @@ class node(object):
                  continue
              
             message = message.split(" ")
+            size = len(message)
             if(message[0] == "find"):
                 id = message[1]
                 #n_prime is just a node number, need communication to that node for information retrieval 
@@ -59,7 +60,40 @@ class node(object):
                 message_comm = "successor"
                 
             elif(message[0]=="leave"):
-                continue
+            #send successor all local keys
+                print "node " + str(self.identifier) + " leaving"
+                #send all the keys to successor
+                rtr_msg = "leavekey"
+                for i in range (0,256):
+                    if (self.keys[i]!=None):
+                        rtr_msg = rtr_msg + " " + str(self.keys[i])
+                print self.fingertable.successor
+                self.send(rtr_msg, defaultPort + self.fingertable.successor)
+                #ack coordinator who is the successor and its own node number
+                rtr_msg = "leavesuccessor " + str(self.fingertable.successor)+ " " + str(self.identifier) 
+                self.send(rtr_msg, defaultPort-1)
+                self.sock_listen.close()         
+                #kill the thread,might be some problem
+                break
+            #handle some predecessor leave. take keys
+            elif(message[0]=="leavekey"):
+            #pair handle, put keys into local set from a leaving predecessor 
+                if(size > 1):
+                    for i in range (0, size-2):
+                        self.keys[message[i+1]] = message[i+1]
+            
+            elif(message[0]=="leaveupdate"):
+                next_successor = message[2]
+                leave_node = message[1]
+                for i in range (0,8):
+                    if(self.fingertable.start_successor[i]==int(leave_node)):
+                         self.fingertable.start_successor[i] = int(next_successor)
+                self.fingertable.successor = self.fingertable.start_successor[0]
+               # if(self.identifier == 4):
+                #    self.fingertable.print_table()
+                if(self.identifier == 2):
+                    self.fingertable.print_table()
+                
             elif(message[0]=="show"):
                 rtr_msg = "ackshow"
                 for i in range (0,256):
@@ -106,7 +140,7 @@ class intervalTable:
     def __init__ (self):
         self.node=0
         self.successor=0
-        self.predecesoor=0
+        self.predecessor=0
         self.start=[None]*8
         self.interval_lower=[None]*8
         self.interval_upper=[None]*8
@@ -117,13 +151,46 @@ class intervalTable:
     def initialize(self, node):
     
         if(node == 0):
+            self.node=0
+            self.successor=2
+            self.predecessor=4
             for i in range (1,9):
-                self.start[i-1] = 2**(i-1) % 256
+                self.start[i-1] = node + 2**(i-1) % 256
             for i in range (1,9):
                 self.interval_lower[i-1] = self.start[i-1]
             for i in range (1,8):
                 self.interval_upper[i-1] = self.start[i]
-            self.interval_upper[7] = 0
+            self.interval_upper[7] = node
+            for i in range (1,9):
+                self.start_successor[i-1] = 2
+            self.print_table()
+            
+        if(node == 2):
+            self.node=2
+            self.successor=4
+            self.predecessor=0
+            for i in range (1,9):
+                self.start[i-1] = node + 2**(i-1) % 256
+            for i in range (1,9):
+                self.interval_lower[i-1] = self.start[i-1]
+            for i in range (1,8):
+                self.interval_upper[i-1] = self.start[i]
+            self.interval_upper[7] = node
+            for i in range (1,9):
+                self.start_successor[i-1] = 4
+            self.print_table()
+        
+        if(node == 4):
+            self.node=4
+            self.successor=0
+            self.predecessor=2
+            for i in range (1,9):
+                self.start[i-1] = node + 2**(i-1) % 256
+            for i in range (1,9):
+                self.interval_lower[i-1] = self.start[i-1]
+            for i in range (1,8):
+                self.interval_upper[i-1] = self.start[i]
+            self.interval_upper[7] = node
             for i in range (1,9):
                 self.start_successor[i-1] = 0
             self.print_table()
@@ -132,6 +199,7 @@ class intervalTable:
     def print_table(self):
         print "node: " + str(self.node)
         print "successor: " + str(self.successor)
+        print "predecessor: " + str(self.predecessor)
         for i in range (1,9):
             print "start: " + str(self.start[i-1]) +" "+ "interval: " + str(self.interval_lower[i-1]) + " " + str(self.interval_upper[i-1]) +" "+ "successor: " + str(self.start_successor[i-1])
     
@@ -175,13 +243,28 @@ class chordlookup(object):
             message = message.split(" ")
             size = len(message)
             message[0] = message[0].strip()
+            
             if(message[0] == "ack"):
                 print "[RECV] " + message[1]
+            
             elif(message[0] == "ackshow"):
                 print "[RECV] show key value" 
                 for i in range (0, size-2):
                     print "[RECV]: " + message[i+1]
-                    
+            
+            elif(message[0] == "leavesuccessor"):
+                next_successor = message[1]
+                leave_node = message[2]
+                #threads[int(leave_node)].join()
+                threads[int(leave_node)] = None
+                msg = "leaveupdate "+ leave_node +" "+ next_successor
+                for i in range (0,256):
+                    if(threads[i]!=None):
+                        self.sock.sendto(msg, (self.selfIP, defaultPort+i ))
+                        
+                        
+                
+            #TO-DO send next successor to all active node in order to update fingertable.  
         
     def coordinator(self):   # Coordinator Thread
         global defaultPort
