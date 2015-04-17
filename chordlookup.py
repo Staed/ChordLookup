@@ -6,11 +6,13 @@ from threading import Thread
 import sys
 from sys import stdin
 
+import time
+
 identifier = 0
 #keys = [None] * 256
 
 threads = [None] * 256
-defaultPort = 8150
+defaultPort = 8200
 show_all_msg = [None] * 256
 #node class
 class node(object):
@@ -36,8 +38,15 @@ class node(object):
         self.t_listen=threading.Thread(target=self.listen)
         self.t_listen.start()
         if(self.identifier == 0):
-            for i in range (0,256):
+            for i in range (5,256):
                 self.keys[i]=i
+            self.keys[0] =0
+        if(self.identifier == 2):
+            self.keys[1]=1
+            self.keys[2]=2
+        if(self.identifier == 4):
+            self.keys[3]=3
+            self.keys[4]=4
         #[Chester] potential some communication with coordinator before call join function.
         self.join(self.identifier)
 
@@ -53,11 +62,21 @@ class node(object):
              
             message = message.split(" ")
             size = len(message)
-            if(message[0] == "find"):
-                id = message[1]
+            if(message[0] == "find"):   # This is actually find_successor
+                print message
+                id = message[1].strip()
+                if size > 2:
+                    reqId = message[2]
+                else:
+                    reqId = self.identifier
+                #threading.Thread(target=self.find_predecessor, args=(id, self.identifier))
+                self.find_predecessor(id, reqId)
+            elif(message[0]=="resfind"):    # Process find results
+                nodevalue = message[1]
                 #n_prime is just a node number, need communication to that node for information retrieval 
-                n_prime = self.find_predecessor(id)
+                n_prime = message[size-1]
                 message_comm = "successor"
+                print "Found at " + str(nodevalue)
                 
             elif(message[0]=="leave"):
             #send successor all local keys
@@ -110,6 +129,9 @@ class node(object):
                         rtr_msg = rtr_msg + " " + str(self.keys[i])
                 rtr_msg = rtr_msg + " " + str(self.identifier)
                 self.send(rtr_msg, defaultPort-1) 
+                
+            elif(message[0]=="table"):
+                self.fingertable.print_table()
     
     def send(self, message, port):
         self.sock_send.sendto(message, (self.selfIP,port))
@@ -123,22 +145,31 @@ class node(object):
         #[Chester]function that updates other nodes' fingertable by passing message.
         pass
     
-    def find_predecessor(self,id):
+    def find_predecessor(self, id, reqId):
         #[Chester]I don't know if this is right
         n_prime = self.identifier
         n_prime_successor = self.fingertable.successor
         n_prime_identifier = self.identifier
         n_prime_start_successor = self.fingertable.start_successor
-        while(id >= n_prime_successor or id <= n_prime_identifier):
-            n_prime = self.closest_preceding_finger(n_prime, id, n_prime_start_successor)
-
+        print str(id) + " np:" + str(n_prime) + " ps:" + str(n_prime_successor) + " pi:" + str(n_prime_identifier)
+        
+        if n_prime_successor == 0:
+            n_prime_successor = 256
+        if int(id) == int(self.identifier) or (int(id) > int(self.identifier) and int(id) <= int(n_prime_successor)):
+            result_string = "resfind " + str(id) + " " + str(self.identifier)
+            self.send(result_string, defaultPort + int(reqId))
+        else:
+            time.sleep(2)
+            self.send("find " + str(id) + " " + str(reqId), defaultPort + self.closest_preceding_finger(n_prime, id, n_prime_start_successor))
             #the function only return a node number, need communication to that node and retrieve successor information.
-        return n_prime   
+        #return n_prime   
     
     def closest_preceding_finger(self, node, id, start_successor):
+        print node
         for i in range (7,-1,-1):
-            if(node< start_successor[i] < id):
-                return start_successor
+            if(int(node) < int(start_successor[i]) and int(start_successor[i]) < int(id) + 256):
+                print "cpf returns " + str(start_successor[i])
+                return start_successor[i]
         return node
     
 #fingertable class 
@@ -167,8 +198,11 @@ class intervalTable:
             for i in range (1,8):
                 self.interval_upper[i-1] = self.start[i]
             self.interval_upper[7] = node
-            for i in range (1,9):
+            for i in range (1,3):
                 self.start_successor[i-1] = 2
+            self.start_successor[2] = 4
+            for i in range (4,9):
+                self.start_successor[i-1] = 0
             self.print_table()
             
         if(node == 2):
@@ -182,8 +216,10 @@ class intervalTable:
             for i in range (1,8):
                 self.interval_upper[i-1] = self.start[i]
             self.interval_upper[7] = node
-            for i in range (1,9):
+            for i in range (1,3):
                 self.start_successor[i-1] = 4
+            for i in range (3,9):
+                self.start_successor[i-1]=0
             self.print_table()
         
         if(node == 4):
@@ -258,7 +294,7 @@ class chordlookup(object):
             
             elif(msg[0] == "ackshow"):
                 print "[RECV] show key value" 
-                for i in range (0, size-2):
+                for i in range (0, size-1):
                     print "[RECV]: " + msg[i+1]
             
             elif(msg[0] == "leavesuccessor"):
@@ -288,6 +324,8 @@ class chordlookup(object):
                     for i in range (0,256):
                         show_all_msg[i]=None 
                         
+
+                        
                 
             #TO-DO send next successor to all active node in order to update fingertable.  
         
@@ -313,7 +351,7 @@ class chordlookup(object):
                 threads[int(cmdP[1])] = thread
 
             elif cmdP[0] == "find":       # find p k
-                self.sock.sendto("find" + cmdP[2], (self.selfIP, defaultPort + int(cmdP[1])))
+                self.sock.sendto("find " + cmdP[2], (self.selfIP, defaultPort + int(cmdP[1])))
                 #data, addr = self.sock.recvfrom(1024)
 
                 # dissect data for location of k (the identifier of a node
@@ -349,7 +387,12 @@ class chordlookup(object):
                 #    countMsg -= 1
             
             #debugging function
-
+            elif cmdP[0] == "table":
+                node_number = cmdP[1].strip()
+                if(threads[int(node_number)]!=None):                  
+                    self.sock.sendto("table", (self.selfIP, defaultPort + int(node_number)))
+                else:
+                    print "the node doesn't exist!"
             
             elif cmdP[0] == "thread":
                 print "active thread as following:"
