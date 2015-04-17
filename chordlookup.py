@@ -75,7 +75,7 @@ class node(object):
                     if (self.keys[i]!=None):
                         rtr_msg = rtr_msg + " " + str(self.keys[i])
                 print self.fingertable.successor
-                self.send(rtr_msg, defaultPort + self.fingertable.successor)
+                self.send(rtr_msg, defaultPort + self.fingertable.successor)    # @TODO self.fingertable.successor can be None, catch this exception
                 #ack coordinator who is the successor and its own node number
                 rtr_msg = "leavesuccessor " + str(self.fingertable.successor)+ " " + str(self.identifier) 
                 self.send(rtr_msg, defaultPort-1)
@@ -96,10 +96,7 @@ class node(object):
                     if(self.fingertable.start_successor[i]==int(leave_node)):
                          self.fingertable.start_successor[i] = int(next_successor)
                 self.fingertable.successor = self.fingertable.start_successor[0]
-               # if(self.identifier == 4):
-                #    self.fingertable.print_table()
-                if(self.identifier == 2):
-                    self.fingertable.print_table()
+
                 
             elif(message[0]=="show"):
                 rtr_msg = "ackshow"
@@ -107,11 +104,16 @@ class node(object):
                     if (self.keys[i]!=None):
                         rtr_msg = rtr_msg + " " + str(self.keys[i])
                 self.send(rtr_msg, defaultPort-1)   
-                
-                
-            elif(message[0]=="show all"):
-                continue
-    
+            elif(message[0]=="showall"):
+                rtr_msg = "ackshowall"
+                for i in range (0,256):
+                    if (self.keys[i]!=None):
+                        rtr_msg = rtr_msg + " " + str(self.keys[i])
+                rtr_msg = rtr_msg + " " + str(self.identifier)
+                self.send(rtr_msg, defaultPort-1)
+            elif(message[0]=="table"):
+                self.fingertable.print_table()
+
     def send(self, message, port):
         self.sock_send.sendto(message, (self.selfIP,port))
     
@@ -325,6 +327,12 @@ class chordlookup(object):
                     else:
                         print "the node doesn't exist!"
 
+            elif cmdP[0] == "table":
+                    node_number = cmdP[1].strip()
+                    if(threads[int(node_number)]!=None):                  
+                        self.sock.sendto("table", (self.selfIP, defaultPort + int(node_number)))
+                    else:
+                        print "the node doesn't exist!"
                 #while countMsg > 0:     # While we still expect a result
                 #    data, addr = self.sock.recvfrom(1024)
                 #    # @TODO[Kelsey] Format data
