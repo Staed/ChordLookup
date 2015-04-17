@@ -147,7 +147,7 @@ class node(object):
     def closest_preceding_finger(self, node, id, start_successor):
         for i in range (7,-1,-1):
             if(node< start_successor[i] < id):
-                return start_successor
+                return start_successor[i]
         return node
     
 #fingertable class 
