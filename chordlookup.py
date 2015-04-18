@@ -157,17 +157,15 @@ class node(object):
             if current < 0:
                 current += 256
                 earlyExit = True
-            #p = self.serial_find_predecessor(current)
-            p = 0
+            p = self.serial_find_predecessor(current)
             if not(p == None):
                 self.send("upFinger " + str(self.identifier) + " " + str(i), defaultPort + int(p))
             if earlyExit:
                 break
 
     def update_finger_table(self, s, i):
-        endNode = self.fingertable.start_successor[i]
-        if self.identifier <= s < endNode:
-            endNode = s
+        if self.identifier <= s < self.fingertable.start_successor[i]:
+            self.fingertable.start_successor[i] = s
             p = self.fingertable.predecessor
             if not(p == 0):
                 self.send("upFinger " + str(s) + " " + str(i), defaultPort + int(p))
@@ -175,9 +173,8 @@ class node(object):
     def serial_find_predecessor(self, id):
         n_prime = self.identifier
         n_prime_successor = self.fingertable.successor
-        n_prime_identifier = self.identifier
         n_prime_start_successor = self.fingertable.start_successor
-        while(id <= n_prime_successor or id > n_prime_identifier):
+        while id <= n_prime_successor and id > n_prime:
             n_prime = self.closest_preceding_finger(n_prime, id, n_prime_start_successor)
         return n_prime   
 
