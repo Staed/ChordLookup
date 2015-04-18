@@ -12,7 +12,7 @@ identifier = 0
 #keys = [None] * 256
 
 threads = [None] * 256
-defaultPort = 8200
+defaultPort = 8210
 show_all_msg = [None] * 256
 #node class
 class node(object):
@@ -72,10 +72,9 @@ class node(object):
                 #threading.Thread(target=self.find_predecessor, args=(id, self.identifier))
                 self.find_predecessor(id, reqId)
             elif(message[0]=="resfind"):    # Process find results
-                nodevalue = message[1]
+                nodevalue = message[2]
                 #n_prime is just a node number, need communication to that node for information retrieval 
                 n_prime = message[size-1]
-                message_comm = "successor"
                 print "Found at " + str(nodevalue)
                 
             elif(message[0]=="leave"):
@@ -86,7 +85,7 @@ class node(object):
                 for i in range (0,256):
                     if (self.keys[i]!=None):
                         rtr_msg = rtr_msg + " " + str(self.keys[i])
-                print self.fingertable.successor
+                print   rtr_msg
                 self.send(rtr_msg, defaultPort + self.fingertable.successor)
                 #ack coordinator who is the successor and its own node number
                 rtr_msg = "leavesuccessor " + str(self.fingertable.successor)+ " " + str(self.identifier) 
@@ -98,7 +97,7 @@ class node(object):
             elif(message[0]=="leavekey"):
             #pair handle, put keys into local set from a leaving predecessor 
                 if(size > 1):
-                    for i in range (0, size-2):
+                    for i in range (0, size-1):
                         self.keys[int(message[i+1])] = int(message[i+1])
             
             elif(message[0]=="leaveupdate"):
@@ -152,12 +151,19 @@ class node(object):
         n_prime_identifier = self.identifier
         n_prime_start_successor = self.fingertable.start_successor
         print str(id) + " np:" + str(n_prime) + " ps:" + str(n_prime_successor) + " pi:" + str(n_prime_identifier)
-        
+        temp_id = int(id)
         if n_prime_successor < n_prime_identifier:
             n_prime_successor = int(n_prime_successor) + 256
-        if int(id) == int(n_prime_identifier) or (int(id) > int(n_prime_identifier) and int(id) <= int(n_prime_successor)):
-            result_string = "resfind " + str(id) + " " + str(self.identifier)
+            if(int(id) < self.identifier):
+                temp_id = temp_id +256
+        if int(id) == int(n_prime_identifier):
+            result_string = "resfind " + str(id) + " " + str(self.identifier) + " " + str(self.identifier)
             self.send(result_string, defaultPort + int(reqId))
+        
+        elif (int(temp_id) > int(n_prime_identifier) and int(temp_id) <= int(n_prime_successor)):
+            result_string = "resfind " + str(id) + " " + str(self.fingertable.successor) + " " + str(self.identifier)
+            self.send(result_string, defaultPort + int(reqId))
+        
         else:
             time.sleep(1)
             self.send("find " + str(id) + " " + str(reqId), defaultPort + self.closest_preceding_finger(n_prime, id, n_prime_start_successor))
@@ -166,13 +172,24 @@ class node(object):
     
     def closest_preceding_finger(self, node, id, start_successor):
         print node
+        
         if int(id) < int(node):
-            id = int(id) + 256
-        for i in range (7,-1,-1):   # @TODO What is this supposed to be?
-            if(int(node) < int(start_successor[i]) and int(start_successor[i]) < int(id)):
-                print "cpf returns " + str(start_successor[i])
-                return start_successor[i]
-        return node
+            temp_id = int(id) + 256         
+            for i in range (7,-1,-1):
+                if(0 <= int(start_successor[i]) and int(start_successor[i])<int(id)):
+                    temp_start_successor = int(start_successor[i])+256
+                else:
+                    temp_start_successor = int(start_successor[i])   # @TODO What is this supposed to be?
+                if(int(node) < temp_start_successor and temp_start_successor < int(temp_id)):
+                    print "cpf returns " + str(start_successor[i])
+                    return start_successor[i]
+            return node
+        else:
+            for i in range (7,-1,-1):   # @TODO What is this supposed to be?
+                if(int(node) < int(start_successor[i]) and int(start_successor[i]) < int(id)):
+                    print "cpf returns " + str(start_successor[i])
+                    return start_successor[i]
+            return node
     
 #fingertable class 
 class intervalTable:
@@ -353,7 +370,14 @@ class chordlookup(object):
                 threads[int(cmdP[1])] = thread
 
             elif cmdP[0] == "find":       # find p k
-                self.sock.sendto("find " + cmdP[2], (self.selfIP, defaultPort + int(cmdP[1])))
+                if(threads[int(cmdP[1])]==None):
+                    print "the node doesn't exist!"
+                
+                if(int(cmdP[2].strip())<0 or int(cmdP[2].strip())>256):
+                    print "the key doesn't exist!"
+                
+                else:
+                    self.sock.sendto("find " + cmdP[2], (self.selfIP, defaultPort + int(cmdP[1])))
                 #data, addr = self.sock.recvfrom(1024)
 
                 # dissect data for location of k (the identifier of a node
