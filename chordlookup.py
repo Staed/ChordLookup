@@ -13,8 +13,9 @@ identifier = 0
 #keys = [None] * 256
 
 threads = [None] * 256
-defaultPort = 8210
+defaultPort = 8220
 show_all_msg = [None] * 256
+msg_count = 0;
 #node class
 class node(object):
 
@@ -115,11 +116,11 @@ class node(object):
                 
             elif(message[0]=="show"):
             #doesn't really have to send back to coordinator. Could just print locally
-                rtr_msg = "ackshow"
+                rtr_msg = "Node " + str(self.identifier) + ": "
                 for i in range (0,256):
                     if (self.keys[i]!=None):
                         rtr_msg = rtr_msg + " " + str(self.keys[i])
-                self.send(rtr_msg, defaultPort-1)   
+                print rtr_msg
                 
                 
             elif(message[0]=="showall"):
@@ -137,6 +138,8 @@ class node(object):
                 self.update_finger_table(int(message[1]), int(message[2]))
     
     def send(self, message, port):
+        global msg_count
+        msg_count=msg_count+1
         self.sock_send.sendto(message, (self.selfIP,port))
     
     def join(self, nodeId):
@@ -333,6 +336,7 @@ class chordlookup(object):
 
     def listen(self):
         reply_ctr =0
+        global msg_count
         while True:
             
             message, addr = self.sock.recvfrom(1024)
@@ -346,11 +350,6 @@ class chordlookup(object):
             if(msg[0] == "ack"):
                 print "[RECV] " + msg[1]
             
-            elif(msg[0] == "ackshow"):
-                print "[RECV] show key value" 
-                for i in range (0, size-1):
-                    print "[RECV]: " + msg[i+1]
-            
             elif(msg[0] == "leavesuccessor"):
                 next_successor = msg[1]
                 leave_node = msg[2]
@@ -359,6 +358,8 @@ class chordlookup(object):
                 send_msg = "leaveupdate "+ leave_node +" "+ next_successor
                 for i in range (0,256):
                     if(threads[i]!=None):
+
+                        msg_count=msg_count+1
                         self.sock.sendto(send_msg, (self.selfIP, defaultPort+i ))
             
             elif(msg[0] == "ackshowall"):
@@ -385,6 +386,7 @@ class chordlookup(object):
         
     def coordinator(self):   # Coordinator Thread
         global defaultPort
+        global msg_count
         exitFlag = False
 
         while not(exitFlag):
@@ -412,14 +414,20 @@ class chordlookup(object):
                     print "the key doesn't exist!"
                 
                 else:
+                    global msg_count
+                    msg_count=msg_count+1
                     self.sock.sendto("find " + cmdP[2], (self.selfIP, defaultPort + int(cmdP[1])))
                 #data, addr = self.sock.recvfrom(1024)
 
                 # dissect data for location of k (the identifier of a node
 
             elif cmdP[0] == "leave":
-                self.num_node= self.num_node-1      # leave p
-                self.sock.sendto("leave", (self.selfIP, defaultPort + int(cmdP[1])))
+                if(threads[int(cmdP[1])]!=None):
+                    self.num_node= self.num_node-1 
+                    msg_count=msg_count+1     # leave p
+                    self.sock.sendto("leave", (self.selfIP, defaultPort + int(cmdP[1])))
+                else:
+                    print "the node doesn't exist!"
                 #data, addr = self.sock.recvfrom(1024)
 
                 #dataS = data.split(" ")
@@ -432,11 +440,13 @@ class chordlookup(object):
                     countMsg = 256
                     for i in range(0, 256):
                         if(threads[i]!=None):
+                            msg_count=msg_count+1
                             self.sock.sendto("showall", (self.selfIP, defaultPort + i))
                 else:
                     #show p, [Chester]edited
                     node_number = cmdP[1].strip()
-                    if(threads[int(node_number)]!=None):                  
+                    if(threads[int(node_number)]!=None):
+                        msg_count=msg_count+1                  
                         self.sock.sendto("show", (self.selfIP, defaultPort + int(node_number)))
                     else:
                         print "the node doesn't exist!"
@@ -450,7 +460,8 @@ class chordlookup(object):
             #debugging function
             elif cmdP[0] == "table":
                 node_number = cmdP[1].strip()
-                if(threads[int(node_number)]!=None):                  
+                if(threads[int(node_number)]!=None):
+                    msg_count=msg_count+1                  
                     self.sock.sendto("table", (self.selfIP, defaultPort + int(node_number)))
                 else:
                     print "the node doesn't exist!"
@@ -461,6 +472,8 @@ class chordlookup(object):
                     if (threads[i] != None):
                         print "Active node %d" % i
                         
+            elif cmdP[0] == "message":
+                print "The total message number so far is: " + str(msg_count)
             
             elif cmdP[0] == "exit":
                 exitFlag = True
