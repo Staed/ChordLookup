@@ -6,6 +6,7 @@ from threading import Thread
 import sys
 from sys import stdin
 import math
+import cPickle as pickle
 
 import time
 
@@ -59,12 +60,12 @@ class node(object):
     def listen(self):
         #print "node " + self.identifier + " listening"
         while True:
-            message, addr = self.sock_listen.recvfrom(1024)
-            print message
-            if not message:
+            msg, addr = self.sock_listen.recvfrom(1024)
+            print msg
+            if not msg:
                  continue
              
-            message = message.split(" ")
+            message = msg.split(" ")
             size = len(message)
             if(message[0] == "find"):   # This is actually find_successor
                 print message
@@ -139,9 +140,12 @@ class node(object):
             elif message[0]=="upFinger":
                 self.update_finger_table(int(message[1]), int(message[2]))
             elif message[0]=="reqFinger":
-                self.send("initFinger " + self.fingertable, defaultPort + int(message[1]))  # @TODO Can't + str and instance objects, fix this
+                fingerStr = pickle.dumps(self.fingertable, -1)
+                self.send("initFinger " + fingerStr, defaultPort + int(message[1]))
             elif message[0]=="initFinger":
-                self.fingertable = message[1]   # @TODO Correct this so it copies entire fingertable
+                self.fingertable = pickle.loads(msg.replace("initFinger ", "", 1))
+                print self.fingertable.start_successor
+                print "\n"
                 self.init_finger_table
     
     def send(self, message, port):
