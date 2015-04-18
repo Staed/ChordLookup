@@ -6,7 +6,7 @@ from threading import Thread
 import sys
 from sys import stdin
 import math
-import cPickle as pickle
+#import cPickle as pickle
 
 import time
 
@@ -31,14 +31,14 @@ class node(object):
         self.sock_listen.bind((self.selfIP, self.port))
         self.keys = [None]*256
         #print "node initiated"
-        self.fingertable = intervalTable()
-        self.fingertable.successor = successorId
+        #self.fingertable = intervalTable()
+        self._successor = successorId
         
     def start(self):
         #notify coordinator the node been created
         message = "ack " + str(self.identifier)
         self.send(message, defaultPort-1)
-        #self.fingertable = intervalTable()
+        self.fingertable = intervalTable()
         #print "node " + self.identifier + " ack message send back to coordinator"
         self.t_listen=threading.Thread(target=self.listen)
         self.t_listen.start()
@@ -53,7 +53,7 @@ class node(object):
             self.keys[3]=3
             self.keys[4]=4
         #[Chester] potential some communication with coordinator before call join function.
-        self.join(self.identifier, self.fingertable.successor)
+        self.join(self.identifier, self._successor)
 
         
         
@@ -140,12 +140,15 @@ class node(object):
             elif message[0]=="upFinger":
                 self.update_finger_table(int(message[1]), int(message[2]))
             elif message[0]=="reqFinger":
-                fingerStr = pickle.dumps(self.fingertable, -1)
-                self.send("initFinger " + fingerStr, defaultPort + int(message[1]))
+                #fingerStr = pickle.dumps(self.fingertable, -1)
+                #self.send("initFinger " + fingerStr, defaultPort + int(message[1]))
+                self.send("initFinger " + str(self.fingertable.predecessor), defaultPort + int(message[1]))
             elif message[0]=="initFinger":
-                self.fingertable = pickle.loads(msg.replace("initFinger ", "", 1))
-                print self.fingertable.start_successor
-                print "\n"
+                #successorId = self.fingertable.successor
+                #self.fingertable = pickle.loads(msg[11:]) #msg.replace("initFinger ", "", 1))
+                #print self.fingertable.start_successor
+                #print len(self.fingertable.start_successor)
+                self.fingertable.predecessor = int(message[1])
                 self.init_finger_table
     
     def send(self, message, port):
@@ -163,15 +166,37 @@ class node(object):
         self.update_others()
 
     def init_finger_table(self):    # @TODO Fix this whole function
-        self.fingertable.start_successor[1] = nodeId.self.find_predecessor(self.fingertable.start)
-        self.fingertable.predecessor = (self.fingertable.successor).predecessor
-        (self.fingertable.successor).predessor = self.identifier
+        #tmpData = self.fingertable
+        #self.fingertable.predecessor = 0
+        #self.fingertable.successor = successorId
+        self.fingertable.node = self.identifier
 
-        for i in range(1, 255):
-            if self.identifier <= self.fingertable.start_successor[i+1].start < self.fingertable.start_successor[i]:
-                self.fingertable.start_successor[i+1] = self.fingertable.start_successor[i]
-            else:
-                self.fingertable.start_successor[i+1] = nodeId.self.find_predecessor(self.fingertable.start_successor[i+1])
+        self.fingertable.start[1] = self.identifier
+        self.fingertable.start_successor[1] = self.fingertable.successor
+        # Do interval
+        self.fingertable.interval_lower[1] = self.fingertable.start[1]
+        self.fingertable.interval_upper[1] = self.fingertable.start[1] + 1
+
+        #for i in range (1,9):
+        #    self.start[i-1] = node + 2**(i-1) % 256
+        #for i in range (1,9):
+        #    self.interval_lower[i-1] = self.start[i-1]
+        #for i in range (1,8):
+        #    self.interval_upper[i-1] = self.start[i]
+        #self.interval_upper[7] = node
+        #for i in range (1,9):
+        #    self.start_successor[i-1] = 0
+        #self.print_table()
+
+        #self.fingertable.start_successor[1] = nodeId.self.find_predecessor(self.fingertable.start)
+        #self.fingertable.predecessor = (self.fingertable.successor).predecessor
+        #(self.fingertable.successor).predessor = self.identifier
+
+        #for i in range(1, 255):
+        #    if self.identifier <= self.fingertable.start_successor[i+1].start < self.fingertable.start_successor[i]:
+        #        self.fingertable.start_successor[i+1] = self.fingertable.start_successor[i]
+        #    else:
+        #        self.fingertable.start_successor[i+1] = nodeId.self.find_predecessor(self.fingertable.start_successor[i+1])
         
     def update_others(self):
         earlyExit = False
