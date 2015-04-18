@@ -151,6 +151,17 @@ class node(object):
         #    for i in range(1, 256):
         #        self.keys[i] = nodeId
         #    self.fingertable.predecessor = nodeId
+
+    def init_finger_table(self):
+        self.fingertable.start_successor[1] = nodeId.self.find_predecessor(self.fingertable.start)
+        self.fingertable.predecessor = (self.fingertable.successor).predecessor
+        (self.fingertable.successor).predessor = self.identifier
+
+        for i in range(1, 255):
+            if self.identifier <= self.fingertable.start_successor[i+1].start < self.fingertable.start_successor[i]:
+                self.fingertable.start_successor[i+1] = self.fingertable.start_successor[i]
+            else:
+                self.fingertable.start_successor[i+1] = nodeId.self.find_predecessor(self.fingertable.start_successor[i+1])
         
     def update_others(self):
         #[Chester]function that updates other nodes' fingertable by passing message.
