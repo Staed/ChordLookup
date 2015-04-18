@@ -5,6 +5,7 @@ import threading
 from threading import Thread
 import sys
 from sys import stdin
+import math
 
 import time
 
@@ -135,15 +136,44 @@ class node(object):
     def send(self, message, port):
         self.sock_send.sendto(message, (self.selfIP,port))
     
-    def join(self,node):
+    def join(self, nodeId):
         #[Chester]node 0 will be directly initialized, other nodes may depends on other info
-        self.fingertable.initialize(node)
-        self.update_others()
+        if not(threads[nodeId] == None):
+            self.fingertable.initialize(nodeId)
+            self.update_others()
+        else:
+            for i in range(1, 256):
+                self.keys[i] = nodeId
+            self.fingertable.predecessor = nodeId
         
     def update_others(self):
         #[Chester]function that updates other nodes' fingertable by passing message.
-        pass
+        for i in range(1, 256):
+            current = self.identifier - math.pow(2, i - 1)
+            while current < 0:
+                current += 256
+            p = self.serial_find_predecessor(current)
+            if not(p == None):
+                p.update_finger_table(self.identifier, i)
+
+    def update_finger_table(self, s, i):
+        endNode = self.fingertable.start_successor[i]
+        if n <= s < endNode:
+            endNode = s
+            p = self.fingertable.predecessor
+            if not(p == 0):
+                p.update_finger_table(s, i)
     
+    def serial_find_predecessor(self, id):
+        n_prime = self.identifier
+        n_prime_successor = self.fingertable.successor
+        n_prime_identifier = self.identifier
+        n_prime_start_successor = self.fingertable.start_successor
+        while(id <= n_prime_successor or id > n_prime_identifier):
+            n_prime = self.closest_preceding_finger(n_prime, id, n_prime_start_successor)
+        return n_prime   
+
+
     def find_predecessor(self, id, reqId):
         #[Chester]I don't know if this is right
         n_prime = self.identifier
