@@ -153,21 +153,23 @@ class node(object):
         n_prime_start_successor = self.fingertable.start_successor
         print str(id) + " np:" + str(n_prime) + " ps:" + str(n_prime_successor) + " pi:" + str(n_prime_identifier)
         
-        if n_prime_successor == 0:
-            n_prime_successor = 256
-        if int(id) == int(self.identifier) or (int(id) > int(self.identifier) and int(id) <= int(n_prime_successor)):
+        if n_prime_successor < n_prime_identifier:
+            n_prime_successor = int(n_prime_successor) + 256
+        if int(id) == int(n_prime_identifier) or (int(id) > int(n_prime_identifier) and int(id) <= int(n_prime_successor)):
             result_string = "resfind " + str(id) + " " + str(self.identifier)
             self.send(result_string, defaultPort + int(reqId))
         else:
-            time.sleep(2)
+            time.sleep(1)
             self.send("find " + str(id) + " " + str(reqId), defaultPort + self.closest_preceding_finger(n_prime, id, n_prime_start_successor))
             #the function only return a node number, need communication to that node and retrieve successor information.
         #return n_prime   
     
     def closest_preceding_finger(self, node, id, start_successor):
         print node
-        for i in range (7,-1,-1):
-            if(int(node) < int(start_successor[i]) and int(start_successor[i]) < int(id) + 256):
+        if int(id) < int(node):
+            id = int(id) + 256
+        for i in range (7,-1,-1):   # @TODO What is this supposed to be?
+            if(int(node) < int(start_successor[i]) and int(start_successor[i]) < int(id)):
                 print "cpf returns " + str(start_successor[i])
                 return start_successor[i]
         return node
