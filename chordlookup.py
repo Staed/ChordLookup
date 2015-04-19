@@ -10,11 +10,13 @@ import math
 
 import time
 
+output = sys.stdout
+
 identifier = 0
 #keys = [None] * 256
 
 threads = [None] * 256
-defaultPort = 8270
+defaultPort = 8300
 show_all_msg = [None] * 256
 msg_count = 0;
 #node class
@@ -55,6 +57,7 @@ class node(object):
         
         
     def listen(self):
+        global output
         #print "node " + self.identifier + " listening"
         while True:
             msg, addr = self.sock_listen.recvfrom(1024)
@@ -143,7 +146,8 @@ class node(object):
                 for i in range (0,256):
                     if (self.keys[i]!=None):
                         rtr_msg = rtr_msg + " " + str(self.keys[i])
-                print rtr_msg
+                print >>output, rtr_msg
+                output.flush()
                 
                 
             elif(message[0]=="showall"):
@@ -530,6 +534,7 @@ class chordlookup(object):
     def listen(self):
         reply_ctr =0
         global msg_count
+        global output
         while True:
             
             message, addr = self.sock.recvfrom(1024)
@@ -567,7 +572,8 @@ class chordlookup(object):
                             keys =""
                             for i in range (1, size-1):
                                 keys = keys + " " + print_msg[i]
-                            print "Node "+ print_msg[size-1] +":"+ keys
+                            print >>output, "Node "+ print_msg[size-1] +":"+ keys
+                            output.flush()
                     reply_ctr = 0
                     for i in range (0,256):
                         show_all_msg[i]=None 
@@ -580,6 +586,7 @@ class chordlookup(object):
     def coordinator(self):   # Coordinator Thread
         global defaultPort
         global msg_count
+        global output
         exitFlag = False
 
         while not(exitFlag):
@@ -662,7 +669,14 @@ class chordlookup(object):
             
             elif cmdP[0] == "exit":
                 exitFlag = True
+        output.close()
 
-if __name__ == '__main__':
+def main(argv):
+    global output
+    if len(argv) > 2:
+        output = open("./" + argv[2], 'w') 
     cl = chordlookup()
     cl.start()
+
+if __name__ == '__main__':
+    main(sys.argv)
