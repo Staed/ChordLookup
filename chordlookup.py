@@ -14,13 +14,13 @@ identifier = 0
 #keys = [None] * 256
 
 threads = [None] * 256
-defaultPort = 8220
+defaultPort = 8270
 show_all_msg = [None] * 256
 msg_count = 0;
 #node class
 class node(object):
 
-    def __init__ (self, identifier_from_coord, successorId):
+    def __init__ (self, identifier_from_coord):
         self.t_listen = None
         self.identifier = int(identifier_from_coord)
         self.fingertable = None
@@ -30,9 +30,7 @@ class node(object):
         self.sock_send = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock_listen.bind((self.selfIP, self.port))
         self.keys = [None]*256
-        #print "node initiated"
-        #self.fingertable = intervalTable()
-        self._successor = successorId
+
         
     def start(self):
         #notify coordinator the node been created
@@ -43,17 +41,16 @@ class node(object):
         self.t_listen=threading.Thread(target=self.listen)
         self.t_listen.start()
         if(self.identifier == 0):
-            for i in range (5,256):
+            for i in range (0,256):
                 self.keys[i]=i
-            self.keys[0] =0
-        if(self.identifier == 2):
-            self.keys[1]=1
-            self.keys[2]=2
-        if(self.identifier == 4):
-            self.keys[3]=3
-            self.keys[4]=4
+        #if(self.identifier == 2):
+        #    self.keys[1]=1
+        #    self.keys[2]=2
+        #if(self.identifier == 4):
+        #    self.keys[3]=3
+        #    self.keys[4]=4
         #[Chester] potential some communication with coordinator before call join function.
-        self.join(self.identifier, self._successor)
+            self.fingertable.initialize(self.identifier)
 
         
         
@@ -67,26 +64,33 @@ class node(object):
              
             message = msg.split(" ")
             size = len(message)
-            if(message[0] == "find"):   # This is actually find_successor
+            message[0] = message[0].strip()
+
+            if(message[0] == "join"):
+                self.join(self.identifier)
+            
+            
+            
+            elif(message[0] == "find"):   # This is actually find_successor
                 print message
                 id = message[1].strip()
                 if size > 2:
-                    reqId = message[2]
+                    reqId = message[2].strip()
                 else:
                     reqId = self.identifier
                 #threading.Thread(target=self.find_predecessor, args=(id, self.identifier))
                 self.find_predecessor(id, reqId)
             elif(message[0]=="resfind"):    # Process find results
-                nodevalue = message[2]
+                nodevalue = message[2].strip()
                 #n_prime is just a node number, need communication to that node for information retrieval 
-                n_prime = message[size-1]
+                n_prime = message[size-1].strip()
                 print "Found at " + str(nodevalue)
                 
             elif(message[0]=="leave"):
             #send successor all local keys
                 print "node " + str(self.identifier) + " leaving"
                 #send all the keys to successor
-                rtr_msg = "leavekey"
+                rtr_msg = "leavekey" 
                 for i in range (0,256):
                     if (self.keys[i]!=None):
                         rtr_msg = rtr_msg + " " + str(self.keys[i])
@@ -95,19 +99,35 @@ class node(object):
                 #ack coordinator who is the successor and its own node number
                 rtr_msg = "leavesuccessor " + str(self.fingertable.successor)+ " " + str(self.identifier) 
                 self.send(rtr_msg, defaultPort-1)
+                
+                rtr_msg = "updatepredeccessor" + " " + str(self.fingertable.predecessor)
+                self.send(rtr_msg, defaultPort + self.fingertable.successor)
+                
                 self.sock_listen.close()         
                 #kill the thread,might be some problem
                 break
             #handle some predecessor leave. take keys
-            elif(message[0]=="leavekey"):
+            elif(message[0]=="leavekey" or message[0] == "joinUpdate"):
             #pair handle, put keys into local set from a leaving predecessor 
                 if(size > 1):
                     for i in range (0, size-1):
                         self.keys[int(message[i+1])] = int(message[i+1])
+                       
+            elif(message[0]=="updatepredeccessor"):
+                self.fingertable.predecessor = int(message[1])
+
+            elif(message[0]=="askpredecessor"):
+                            
+                message[1] = message[1].strip()
+                msg = "ackask "+ str(self.fingertable.predecessor)
+                self.send(msg, defaultPort+int(message[1]))
+                self.fingertable.predecessor = int(message[1])
+
+            
             
             elif(message[0]=="leaveupdate"):
-                next_successor = message[2]
-                leave_node = message[1]
+                next_successor = message[2].strip()
+                leave_node = message[1].strip()
                 for i in range (0,8):
                     if(self.fingertable.start_successor[i]==int(leave_node)):
                          self.fingertable.start_successor[i] = int(next_successor)
@@ -136,47 +156,112 @@ class node(object):
                 
             elif(message[0]=="table"):
                 self.fingertable.print_table()
-
-            elif message[0]=="upFinger":
-                self.update_finger_table(int(message[1]), int(message[2]))
-            elif message[0]=="reqFinger":
+                
+            elif(message[0]=="updateFinger"):
+                self.update_finger_table(int(message[1].strip()), int(message[2].strip()))
+            
+            elif(message[0]=="joinTransfer"):
+                if(self.identifier > self.fingertable.predecessor):
+                    rtr_msg = "joinUpdate"
+                    for i in range (self.identifier+1, 255):
+                        if (self.keys[i]!=None):
+                            rtr_msg = rtr_msg + " " + str(self.keys[i])
+                            self.keys[i]=None
+                    for i in range (0, self.fingertable.predecessor+1):
+                        if (self.keys[i]!=None):
+                            rtr_msg = rtr_msg + " " + str(self.keys[i])
+                            self.keys[i]=None
+                    self.send(rtr_msg, defaultPort+self.fingertable.predecessor)
+                else:
+                    rtr_msg = "joinUpdate"
+                    for i in range (self.identifier+1, self.fingertable.predecessor+1):
+                        if (self.keys[i]!=None):
+                            rtr_msg = rtr_msg + " " + str(self.keys[i])
+                            self.keys[i]=None
+                    self.send(rtr_msg, defaultPort+self.fingertable.predecessor)
+                    
+           # elif message[0]=="upFinger":
+           #     self.update_finger_table(int(message[1]), int(message[2]))
+           # elif message[0]=="reqFinger":
                 #fingerStr = pickle.dumps(self.fingertable, -1)
                 #self.send("initFinger " + fingerStr, defaultPort + int(message[1]))
-                self.send("initFinger " + str(self.fingertable.predecessor), defaultPort + int(message[1]))
-            elif message[0]=="initFinger":
+           #     self.send("initFinger " + str(self.fingertable.predecessor), defaultPort + int(message[1]))
+           # elif message[0]=="initFinger":
                 #successorId = self.fingertable.successor
                 #self.fingertable = pickle.loads(msg[11:]) #msg.replace("initFinger ", "", 1))
                 #print self.fingertable.start_successor
                 #print len(self.fingertable.start_successor)
-                self.fingertable.predecessor = int(message[1])
-                self.init_finger_table
+            #    self.fingertable.predecessor = int(message[1])
+            #    self.init_finger_table
     
     def send(self, message, port):
         global msg_count
         msg_count=msg_count+1
         self.sock_send.sendto(message, (self.selfIP,port))
     
-    def join(self, nodeId, successorId):
+    def join(self, nodeId):
         #[Chester]node 0 will be directly initialized, other nodes may depends on other info
-        if int(nodeId) == 0 or int(nodeId) == 2 or int(nodeId == 4):
+            #or int(nodeId) == 2 or int(nodeId == 4):
             self.fingertable.initialize(nodeId)
-        else:
-            reqString = "reqFinger " + str(successorId)
-            self.send(reqString, defaultPort + int(successorId))
-        self.update_others()
-
-    def init_finger_table(self):    # @TODO Fix this whole function
-        #tmpData = self.fingertable
-        #self.fingertable.predecessor = 0
-        #self.fingertable.successor = successorId
-        self.fingertable.node = self.identifier
-
-        self.fingertable.start[1] = self.identifier
-        self.fingertable.start_successor[1] = self.fingertable.successor
-        # Do interval
-        self.fingertable.interval_lower[1] = self.fingertable.start[1]
-        self.fingertable.interval_upper[1] = self.fingertable.start[1] + 1
-
+            #reqString = "reqFinger " + str(successorId)
+            #self.send(reqString, defaultPort + int(successorId))
+            self.init_finger_table(nodeId)
+            print "init done. doing update others"
+            self.update_others(nodeId)
+            print "update others done. doing key transfer"
+            #time.sleep(5)
+            self.send("joinTransfer", defaultPort + self.fingertable.successor)
+            
+            
+    def init_finger_table(self, nodeId):    # @TODO Fix this whole function
+        msg = "find "+ str(self.fingertable.start[0])+" "+str(nodeId)
+        self.send(msg,defaultPort)
+        while(True):
+            msg, addr = self.sock_listen.recvfrom(1024)
+            if not msg:
+                 continue
+            else:
+                print "[find_predecessor] :" + msg
+                break
+        msg = msg.split(" ")
+        msg[2] = msg[2].strip()
+        self.fingertable.successor = int(msg[2])
+        self.fingertable.start_successor[0] = int(msg[2])
+        message = "askpredecessor "+ str(self.identifier)
+        self.send(message, defaultPort + int(self.fingertable.successor))
+        while(True):
+            msg, addr = self.sock_listen.recvfrom(1024)
+            print msg
+            if not msg:
+                 continue
+            else:
+                print "[ask_predecessor] :" + msg
+                break
+        msg = msg.split(" ")
+        self.fingertable.predecessor = int(msg[1].strip())
+        for i in range (0, 7):
+            print "I am in loop: " + str(i) + " " + str(nodeId) + " "+ str(self.fingertable.start[i+1]) + " " + str(self.fingertable.start_successor[i])
+            if(int(nodeId) <= int(self.fingertable.start[i+1]) < int(self.fingertable.start_successor[i])):
+                self.fingertable.start_successor[i+1] = self.fingertable.start_successor[i]
+                print "I am here for loading message in round: " + str(i)
+            else:
+                #self.find_predecessor(self.fingertable.start[i+1], nodeId)
+                print "I am here for sending message in round: " + str(i)
+                msg = "find "+ str(self.fingertable.start[i+1])+" "+str(nodeId)
+                self.send(msg,defaultPort)
+                while(True):
+                    msg, addr = self.sock_listen.recvfrom(1024)
+                    print msg
+                    if not msg:
+                        continue
+                    else:
+                        print "[find_predecessor] :" + msg
+                        break
+                msg = msg.split(" ")
+                print "[HERE] "+ msg[2].strip() + " i is :" + str(i)
+                self.fingertable.start_successor[i+1] = msg[2].strip()
+                #if not(self.fingertable.start[i+1] <= self.fingertable.start_successor[i+1] <= nodeId):
+                #    self.fingertable.start_successor[i+1] = nodeId
         #for i in range (1,9):
         #    self.start[i-1] = node + 2**(i-1) % 256
         #for i in range (1,9):
@@ -198,25 +283,86 @@ class node(object):
         #    else:
         #        self.fingertable.start_successor[i+1] = nodeId.self.find_predecessor(self.fingertable.start_successor[i+1])
         
-    def update_others(self):
-        earlyExit = False
-        for i in range(1, 256):
-            current = self.identifier - math.pow(2, i - 1)
-            if current < 0:
-                current += 256
-                earlyExit = True
-            p = self.serial_find_predecessor(current)
-            if not(p == None):
-                self.send("upFinger " + str(self.identifier) + " " + str(i), defaultPort + int(p))
-            if earlyExit:
-                break
+    def update_others(self, nodeId):
+            i=0
+       
+                        
+
+            #p = int(msg[3].strip())
+            message = "updateFinger "+ str(nodeId) + " " + str(i)
+            p = self.fingertable.predecessor
+            self.send(message, defaultPort + p)
+        #earlyExit = False
+        #for i in range(1, 256):
+        #    current = self.identifier - math.pow(2, i - 1)
+        #    if current < 0:
+        #        current += 256
+        #        earlyExit = True
+        #    p = self.serial_find_predecessor(current)
+        #    if not(p == None):
+        #        self.send("upFinger " + str(self.identifier) + " " + str(i), defaultPort + int(p))
+        #    if earlyExit:
+        #        break
 
     def update_finger_table(self, s, i):
-        if self.identifier <= s < self.fingertable.start_successor[i]:
-            self.fingertable.start_successor[i] = s
-            p = self.fingertable.predecessor
-            if not(p == 0):
-                self.send("upFinger " + str(s) + " " + str(i), defaultPort + int(p))
+        print "update finger table at: " + str(self.identifier)
+        print "update s is: " + str(s) + " i is : " + str(i)
+        if(s == self.identifier):
+            return
+        for j in range (0, 8):
+            #if(0 <= self.fingertable.start_successor[j] <= self.identifier):
+            #    temp = self.fingertable.start_successor[j] + 256
+            #else:
+            #    temp = self.fingertable.start_successor[j]
+        
+            #if (self.identifier+1) <= s < temp:
+            #    self.fingertable.start_successor[i] = s
+            #    p = self.fingertable.predecessor
+            #    if(self.identifier != p):
+            #        message = "updateFinger "+ str(s) + " " + str(i)
+            #        self.send(message, defaultPort + p)
+            if self.fingertable.interval_upper[j] < self.fingertable.interval_lower[j]:
+                temp = 256 +self.fingertable.interval_upper[j]
+            else:
+                temp = self.fingertable.interval_upper[j]
+            if(self.fingertable.interval_lower[j]<= s):
+                if(self.fingertable.start_successor[j]==0 or (self.fingertable.start_successor[j]>s)):
+                    self.fingertable.start_successor[j] = s                   
+        self.fingertable.successor = self.fingertable.start_successor[0]
+        p = self.fingertable.predecessor
+        message = "updateFinger "+ str(s) + " " + str(i)
+        self.send(message, defaultPort + p)
+
+       # while(True):
+       #     msg, addr = self.sock_listen.recvfrom(1024)
+       #     print msg
+       #     if not msg:
+       #          continue
+       #     else:
+       #         
+       #         print "[ask_predecessor] :" + msg
+       #         msg = msg.split(" ")
+       #         size = len(msg)
+       #         if(msg[0]=="ackask"):
+       #             break#
+
+       #         elif(msg[0]=="find"):
+       #             id = msg[1].strip()
+       #             if size > 2:
+       #                 reqId = msg[2].strip()
+       #             else:
+       #                 reqId = self.identifier
+                #threading.Thread(target=self.find_predecessor, args=(id, self.identifier))
+       #             self.find_predecessor(id, reqId)
+       #             break
+       #         elif(msg[0]=="updateFinger"):
+       #             self.update_finger_table(int(msg[1].strip()), int(msg[2].strip()))
+       #             break
+
+       #     self.fingertable.predecessor = int(msg[1].strip())
+        
+            #if not(p == 0):
+             #   self.send("upFinger " + str(s) + " " + str(i), defaultPort + int(p))
     
     def serial_find_predecessor(self, id):
         n_prime = self.identifier
@@ -242,13 +388,13 @@ class node(object):
             result_string = "resfind " + str(id) + " " + str(self.identifier) + " " + str(self.identifier)
             self.send(result_string, defaultPort + int(reqId))
         
-        elif (int(temp_id) > int(n_prime_identifier) and int(temp_id) <= int(n_prime_successor)):
+        elif (int(temp_id) > int(n_prime_identifier) and int(temp_id) <= int(n_prime_successor)) or (int(n_prime) == int(n_prime_successor)):
             result_string = "resfind " + str(id) + " " + str(self.fingertable.successor) + " " + str(self.identifier)
             self.send(result_string, defaultPort + int(reqId))
         
         else:
-            time.sleep(1)
-            self.send("find " + str(id) + " " + str(reqId), defaultPort + self.closest_preceding_finger(n_prime, id, n_prime_start_successor))
+            #time.sleep(1)
+            self.send("find " + str(id) + " " + str(reqId), defaultPort + int(self.closest_preceding_finger(n_prime, id, n_prime_start_successor)))
             #the function only return a node number, need communication to that node and retrieve successor information.
     
     def closest_preceding_finger(self, node, id, start_successor):
@@ -289,45 +435,10 @@ class intervalTable:
     
         if(node == 0):
             self.node=0
-            self.successor=2
-            self.predecessor=4
-            for i in range (1,9):
-                self.start[i-1] = node + 2**(i-1) % 256
-            for i in range (1,9):
-                self.interval_lower[i-1] = self.start[i-1]
-            for i in range (1,8):
-                self.interval_upper[i-1] = self.start[i]
-            self.interval_upper[7] = node
-            for i in range (1,3):
-                self.start_successor[i-1] = 2
-            self.start_successor[2] = 4
-            for i in range (4,9):
-                self.start_successor[i-1] = 0
-            self.print_table()
-            
-        if(node == 2):
-            self.node=2
-            self.successor=4
+            self.successor=0
             self.predecessor=0
             for i in range (1,9):
-                self.start[i-1] = node + 2**(i-1) % 256
-            for i in range (1,9):
-                self.interval_lower[i-1] = self.start[i-1]
-            for i in range (1,8):
-                self.interval_upper[i-1] = self.start[i]
-            self.interval_upper[7] = node
-            for i in range (1,3):
-                self.start_successor[i-1] = 4
-            for i in range (3,9):
-                self.start_successor[i-1]=0
-            self.print_table()
-        
-        if(node == 4):
-            self.node=4
-            self.successor=0
-            self.predecessor=2
-            for i in range (1,9):
-                self.start[i-1] = node + 2**(i-1) % 256
+                self.start[i-1] = (node + 2**(i-1)) % 256
             for i in range (1,9):
                 self.interval_lower[i-1] = self.start[i-1]
             for i in range (1,8):
@@ -335,7 +446,49 @@ class intervalTable:
             self.interval_upper[7] = node
             for i in range (1,9):
                 self.start_successor[i-1] = 0
+
             self.print_table()
+            
+        else:
+            self.node = node
+            for i in range (1,9):
+                self.start[i-1] = (node + 2**(i-1)) % 256
+            for i in range (1,9):
+                self.interval_lower[i-1] = self.start[i-1]
+            for i in range (1,8):
+                self.interval_upper[i-1] = self.start[i]
+            self.interval_upper[7] = node
+        #if(node == 2):
+        #    self.node=2
+        #    self.successor=4
+        #    self.predecessor=0
+        #    for i in range (1,9):
+        #        self.start[i-1] = node + 2**(i-1) % 256
+        #    for i in range (1,9):
+        #        self.interval_lower[i-1] = self.start[i-1]
+        #    for i in range (1,8):
+        #        self.interval_upper[i-1] = self.start[i]
+        #    self.interval_upper[7] = node
+        #    for i in range (1,3):
+        #        self.start_successor[i-1] = 4
+        #    for i in range (3,9):
+        #        self.start_successor[i-1]=0
+        #    self.print_table()
+        
+       # if(node == 4):
+       #     self.node=4
+       #     self.successor=0
+       #     self.predecessor=2
+       #     for i in range (1,9):
+       #         self.start[i-1] = node + 2**(i-1) % 256
+       #     for i in range (1,9):
+       #         self.interval_lower[i-1] = self.start[i-1]
+       #     for i in range (1,8):
+       #        self.interval_upper[i-1] = self.start[i]
+       #     self.interval_upper[7] = node
+       #     for i in range (1,9):
+       #        self.start_successor[i-1] = 0
+       #     self.print_table()
     
     #debugging function
     def print_table(self):
@@ -364,7 +517,7 @@ class chordlookup(object):
         self.t_coord.start()
 
 
-        defaultNode = node("0", "0")
+        defaultNode = node("0")
         thread = threading.Thread(target=defaultNode.start)
         thread.start()
         threads[0] = thread
@@ -438,21 +591,17 @@ class chordlookup(object):
                 cmdP[1] = cmdP[1].strip()
             cmdP[0] = cmdP[0].lower()
             
-            if cmdP[0] == "join":       # join p
-                # @TODO[Kelsey] Check if thread P already exists
+            if cmdP[0] == "join":     
                 self.num_node= self.num_node+1
 
-                for i in range(int(cmdP[1]), 256):
-                    if threads[i] != None:
-                        break
-                    i += 1
-                if i == 256:
-                    i = 0
-                
-                nS = node(cmdP[1], i)
-                thread = threading.Thread(target=nS.start)
-                thread.start()
-                threads[int(cmdP[1])] = thread
+                if(threads[int(cmdP[1])]!=None):
+                    print "The node is already in the network"
+                else:                 
+                    nS = node(cmdP[1])
+                    thread = threading.Thread(target=nS.start)
+                    thread.start()
+                    threads[int(cmdP[1])] = thread
+                    self.sock.sendto("join", (self.selfIP,defaultPort + int(cmdP[1])))
 
             elif cmdP[0] == "find":       # find p k
                 if(threads[int(cmdP[1])]==None):
