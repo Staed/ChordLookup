@@ -502,13 +502,16 @@ class chordlookup(object):
             elif cmdP[0] == "message":
                 print "The total message number so far is: " + str(msg_count)
             
+            elif cmdP[0] == "wait":
+                time.sleep(float(cmdP[1]))
+
             elif cmdP[0] == "exit":
                 exitFlag = True
         output.close()
 
 def main(argv):
     global output
-    if len(argv) > 2:
+    if len(argv) > 2 and str(argv[1]) == "-g":
         output = open("./" + argv[2], 'w') 
     cl = chordlookup()
     cl.start()
