@@ -33,6 +33,7 @@ class node(object):
         #print "node initiated"
         #self.fingertable = intervalTable()
         self._successor = successorId
+        self._predecessor = 0
         
     def start(self):
         #notify coordinator the node been created
@@ -53,10 +54,8 @@ class node(object):
             self.keys[3]=3
             self.keys[4]=4
         #[Chester] potential some communication with coordinator before call join function.
-        self.join(self.identifier, self._successor)
+        self.join(self.identifier)
 
-        
-        
     def listen(self):
         #print "node " + self.identifier + " listening"
         while True:
@@ -148,56 +147,27 @@ class node(object):
                 #self.fingertable = pickle.loads(msg[11:]) #msg.replace("initFinger ", "", 1))
                 #print self.fingertable.start_successor
                 #print len(self.fingertable.start_successor)
-                self.fingertable.predecessor = int(message[1])
-                self.init_finger_table
+                self._predecessor = int(message[1])
+                #self.fingertable.predecessor = int(message[1])
+                self.fingertable.init(self.identifier, self._successor, self._predecessor)
+                print "ftNode: " + str(self.fingertable.node) + " ftPred: " + str(self.fingertable.predecessor) + " ftStartSuc: " + str(self.fingertable.start_successor[1])
     
     def send(self, message, port):
         global msg_count
         msg_count=msg_count+1
         self.sock_send.sendto(message, (self.selfIP,port))
     
-    def join(self, nodeId, successorId):
+    def join(self, nodeId):
         #[Chester]node 0 will be directly initialized, other nodes may depends on other info
-        if int(nodeId) == 0 or int(nodeId) == 2 or int(nodeId == 4):
-            self.fingertable.initialize(nodeId)
+        if not(int(nodeId) == 0 or int(nodeId) == 2 or int(nodeId == 4)):
+            reqString = "reqFinger " + str(self._successor)
+            self.send(reqString, defaultPort + int(self._successor))
+            #self.fingertable.successor = successorId
+            #self.fingertable.node = nodeId
         else:
-            reqString = "reqFinger " + str(successorId)
-            self.send(reqString, defaultPort + int(successorId))
+            self.fingertable.initialize(nodeId)
         self.update_others()
 
-    def init_finger_table(self):    # @TODO Fix this whole function
-        #tmpData = self.fingertable
-        #self.fingertable.predecessor = 0
-        #self.fingertable.successor = successorId
-        self.fingertable.node = self.identifier
-
-        self.fingertable.start[1] = self.identifier
-        self.fingertable.start_successor[1] = self.fingertable.successor
-        # Do interval
-        self.fingertable.interval_lower[1] = self.fingertable.start[1]
-        self.fingertable.interval_upper[1] = self.fingertable.start[1] + 1
-
-        #for i in range (1,9):
-        #    self.start[i-1] = node + 2**(i-1) % 256
-        #for i in range (1,9):
-        #    self.interval_lower[i-1] = self.start[i-1]
-        #for i in range (1,8):
-        #    self.interval_upper[i-1] = self.start[i]
-        #self.interval_upper[7] = node
-        #for i in range (1,9):
-        #    self.start_successor[i-1] = 0
-        #self.print_table()
-
-        #self.fingertable.start_successor[1] = nodeId.self.find_predecessor(self.fingertable.start)
-        #self.fingertable.predecessor = (self.fingertable.successor).predecessor
-        #(self.fingertable.successor).predessor = self.identifier
-
-        #for i in range(1, 255):
-        #    if self.identifier <= self.fingertable.start_successor[i+1].start < self.fingertable.start_successor[i]:
-        #        self.fingertable.start_successor[i+1] = self.fingertable.start_successor[i]
-        #    else:
-        #        self.fingertable.start_successor[i+1] = nodeId.self.find_predecessor(self.fingertable.start_successor[i+1])
-        
     def update_others(self):
         earlyExit = False
         for i in range(1, 256):
@@ -284,7 +254,20 @@ class intervalTable:
         self.start_successor=[None]*8
         #print "fingertable initiated"
         #TO-ADD char str[INET_ADDRSTRLEN];
-        
+    
+    def init(self, node, successor, predecessor):
+        self.node = node
+        self.successor = successor
+        self.predecessor = predecessor
+
+        i = 0
+        while 0 <= i < 8:
+            self.start[i] = (node + math.pow(2, i)) % 256
+            self.interval_lower = self.start[i]
+            self.interval_upper = (node + math.pow(2, i+1)) % 256
+            self.start_successor[i] = self.successor
+            i += 1
+
     def initialize(self, node):
     
         if(node == 0):
@@ -344,8 +327,6 @@ class intervalTable:
         print "predecessor: " + str(self.predecessor)
         for i in range (1,9):
             print "start: " + str(self.start[i-1]) +" "+ "interval: " + str(self.interval_lower[i-1]) + " " + str(self.interval_upper[i-1]) +" "+ "successor: " + str(self.start_successor[i-1])
-    
-
 
 
 #coordinator class
