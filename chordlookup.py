@@ -153,8 +153,9 @@ class node(object):
                     self._successor = 0
                 if self._predecessor == None:
                     self._predecessor = 0
+                #print "Uh... " + str(self.identifier)
                 self.fingertable.init(self.identifier, self._successor, self._predecessor)
-                print "ftNode: " + str(self.fingertable.node) + " ftPred: " + str(self.fingertable.predecessor) + " ftStartSuc: " + str(self.fingertable.start_successor[1])
+                #print "ftNode: " + str(self.fingertable.node) + " ftPred: " + str(self.fingertable.predecessor) + " ftStartSuc: " + str(self.fingertable.start_successor[1])
     
     def send(self, message, port):
         global msg_count
@@ -164,7 +165,7 @@ class node(object):
     def join(self, nodeId):
         #[Chester]node 0 will be directly initialized, other nodes may depends on other info
         if not(int(nodeId) == 0 or int(nodeId) == 2 or int(nodeId == 4)):
-            reqString = "reqFinger " + str(self._successor)
+            reqString = "reqFinger " + str(self.identifier)
             self.send(reqString, defaultPort + int(self._successor))
             #self.fingertable.successor = successorId
             #self.fingertable.node = nodeId
@@ -175,7 +176,7 @@ class node(object):
     def update_others(self):
         earlyExit = False
         for i in range(1, 256):
-            current = self.identifier - math.pow(2, i - 1)
+            current = self.identifier - 2**(i-1)
             if current < 0:
                 current += 256
                 earlyExit = True
@@ -189,6 +190,7 @@ class node(object):
         if self.identifier <= s < self.fingertable.start_successor[i]:
             self.fingertable.start_successor[i] = s
             p = self.fingertable.predecessor
+            print "p is " + str(p)
             if not(p == 0):
                 self.send("upFinger " + str(s) + " " + str(i), defaultPort + int(p))
     
@@ -264,19 +266,13 @@ class intervalTable:
         self.successor = successor
         self.predecessor = predecessor
 
-        #i = 0
-        #while 0 <= i < 8:
-        #    self.start[i] = (node + 2**(i)) % 256
-        #    self.interval_lower = self.start[i]
-        #    self.interval_upper = (node + 2**(i+1)) % 256
-        #    self.start_successor[i] = self.successor
-        #    i += 1
         for i in range(1,9):
             self.start[i-1] = (int(node) + 2**(i-1)) % 256
             self.interval_lower[i-1] = self.start[i-1]
         for i in range(1,8):
             self.interval_upper[i-1] = self.start[i]
         self.interval_upper[7] = node
+        #print "./../../.... " + str(node)
         for i in range(1, int(node)):
             self.start_successor[i-1] = predecessor
         for i in range(int(node), 9):
